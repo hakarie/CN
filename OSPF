@@ -1,0 +1,124 @@
+import java.util.*;
+
+class NetworkNode {
+    private String name;
+    private Map<String, Map<String, Integer>> linkStateDB;
+
+    public NetworkNode(String name) {
+        this.name = name;
+        this.linkStateDB = new HashMap<>();
+    }
+
+    public void originateLSA(Map<String, Integer> neighbors) {
+        linkStateDB.put(name, new HashMap<>(neighbors));
+    }
+
+    public void receiveLSDB(Map<String, Map<String, Integer>> otherLSDB) {
+        boolean updated = false;
+
+        for (Map.Entry<String, Map<String, Integer>> entry : otherLSDB.entrySet()) {
+            String router = entry.getKey();
+            Map<String, Integer> neighbors = entry.getValue();
+
+            if (!linkStateDB.containsKey(router)) {
+                linkStateDB.put(router, new HashMap<>(neighbors));
+                updated = true;
+            } else {
+                Map<String, Integer> currentNeighbors = linkStateDB.get(router);
+                for (Map.Entry<String, Integer> nbrEntry : neighbors.entrySet()) {
+                    String nbr = nbrEntry.getKey();
+                    int cost = nbrEntry.getValue();
+                    if (!currentNeighbors.containsKey(nbr) || currentNeighbors.get(nbr) != cost) {
+                        currentNeighbors.put(nbr, cost);
+                        updated = true;
+                    }
+                }
+            }
+        }
+    }
+
+    public Map<String, Integer> computeShortestPaths() {
+        Map<String, Integer> dist = new HashMap<>();
+        Set<String> visited = new HashSet<>();
+        PriorityQueue<Node> pq = new PriorityQueue<>(Comparator.comparingInt(n -> n.cost));
+
+        dist.put(name, 0);
+        pq.add(new Node(name, 0));
+
+        while (!pq.isEmpty()) {
+            Node current = pq.poll();
+            if (visited.contains(current.router)) continue;
+            visited.add(current.router);
+
+            Map<String, Integer> neighbors = linkStateDB.getOrDefault(current.router, new HashMap<>());
+
+            for (Map.Entry<String, Integer> nbrEntry : neighbors.entrySet()) {
+                String nbr = nbrEntry.getKey();
+                int cost = nbrEntry.getValue();
+
+                int newDist = dist.get(current.router) + cost;
+                if (newDist < dist.getOrDefault(nbr, Integer.MAX_VALUE)) {
+                    dist.put(nbr, newDist);
+                    pq.add(new Node(nbr, newDist));
+                }
+            }
+        }
+        return dist;
+    }
+
+    public void printRoutingTable() {
+        System.out.println("Routing table for Router " + name);
+        Map<String, Integer> routingTable = computeShortestPaths();
+        for (Map.Entry<String, Integer> entry : routingTable.entrySet()) {
+            System.out.println("Dest: " + entry.getKey() + ", Cost: " + entry.getValue());
+        }
+        System.out.println();
+    }
+
+    public Map<String, Map<String, Integer>> getLinkStateDB() {
+        return linkStateDB;
+    }
+
+    private static class Node {
+        String router;
+        int cost;
+
+        Node(String router, int cost) {
+            this.router = router;
+            this.cost = cost;
+        }
+    }
+
+    public static void main(String[] args) {
+        NetworkNode A = new NetworkNode("A");
+        NetworkNode B = new NetworkNode("B");
+        NetworkNode C = new NetworkNode("C");
+        NetworkNode D = new NetworkNode("D");
+
+        A.originateLSA(Map.of("B", 3, "C", 4));
+        B.originateLSA(Map.of("A", 1, "C", 2, "D", 5));
+        C.originateLSA(Map.of("A", 4, "B", 6, "D", 3));
+        D.originateLSA(Map.of("B", 3, "C", 1));
+
+        A.receiveLSDB(B.getLinkStateDB());
+        A.receiveLSDB(C.getLinkStateDB());
+        A.receiveLSDB(D.getLinkStateDB());
+
+        B.receiveLSDB(A.getLinkStateDB());
+        B.receiveLSDB(C.getLinkStateDB());
+        B.receiveLSDB(D.getLinkStateDB());
+
+        C.receiveLSDB(A.getLinkStateDB());
+        C.receiveLSDB(B.getLinkStateDB());
+        C.receiveLSDB(D.getLinkStateDB());
+
+        D.receiveLSDB(A.getLinkStateDB());
+        D.receiveLSDB(B.getLinkStateDB());
+        D.receiveLSDB(C.getLinkStateDB());
+
+        A.printRoutingTable();
+        B.printRoutingTable();
+        C.printRoutingTable();
+        D.printRoutingTable();
+    }
+}
